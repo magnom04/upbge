@@ -4,6 +4,7 @@ uniform sampler2D areaTex;
 uniform sampler2D searchTex;
 uniform sampler2D blendTex;
 uniform sampler2D colorTex;
+uniform sampler2D velocityBuffer;
 
 in vec2 uvs;
 in vec2 pixcoord;
@@ -31,6 +32,6 @@ void main()
 
 #elif SMAA_STAGE == 2
   fragColor = vec4(0.0);
-  fragColor += SMAANeighborhoodBlendingPS(uvs, offset[0], colorTex, blendTex);
+  fragColor += SMAANeighborhoodBlendingPS(uvs, offset[0], colorTex, blendTex, velocityBuffer);
 #endif
 }

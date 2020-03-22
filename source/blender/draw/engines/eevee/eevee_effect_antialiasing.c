@@ -110,7 +110,7 @@ int EEVEE_antialiasing_engine_init(EEVEE_Data *vedata)
     GPU_texture_filter_mode(txl->smaa_area_tx, true);
     GPU_texture_unbind(txl->smaa_area_tx);
   }
-  return EFFECT_SMAA;
+  return EFFECT_SMAA | EFFECT_VELOCITY_BUFFER;
 }
 
 void EEVEE_antialiasing_cache_init(EEVEE_Data *vedata)
@@ -163,6 +163,7 @@ void EEVEE_antialiasing_cache_init(EEVEE_Data *vedata)
     grp = DRW_shgroup_create(sh, psl->aa_resolve_ps);
     DRW_shgroup_uniform_texture(grp, "blendTex", g_data->smaa_weight_tx);
     DRW_shgroup_uniform_texture(grp, "colorTex", txl->history_buffer_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "velocityBuffer", &effects->velocity_tx);
     DRW_shgroup_uniform_vec4_copy(grp, "viewportMetrics", metrics);
 
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
