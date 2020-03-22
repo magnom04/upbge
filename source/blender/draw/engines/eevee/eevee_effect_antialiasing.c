@@ -118,7 +118,6 @@ void EEVEE_antialiasing_cache_init(EEVEE_Data *vedata)
   EEVEE_TextureList *txl = vedata->txl;
   EEVEE_PrivateData *g_data = vedata->stl->g_data;
   EEVEE_PassList *psl = vedata->psl;
-  DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
   DRWShadingGroup *grp = NULL;
 
   EEVEE_EffectsInfo *effects = vedata->stl->effects;

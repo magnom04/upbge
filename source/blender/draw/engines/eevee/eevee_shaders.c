@@ -102,8 +102,8 @@ extern char datatoc_effect_temporal_aa_glsl[];
 
 /* Game engine transition */
 extern char datatoc_common_smaa_lib_glsl[];
-extern char datatoc_workbench_effect_smaa_frag_glsl[];
-extern char datatoc_workbench_effect_smaa_vert_glsl[];
+extern char datatoc_effect_smaa_frag_glsl[];
+extern char datatoc_effect_smaa_vert_glsl[];
 
 GPUShader *eevee_shader_antialiasing_get(int stage)
 {
@@ -119,7 +119,7 @@ GPUShader *eevee_shader_antialiasing_get(int stage)
                 "#define SMAA_INCLUDE_PS 0\n",
                 "uniform vec4 viewportMetrics;\n",
                 datatoc_common_smaa_lib_glsl,
-                datatoc_workbench_effect_smaa_vert_glsl,
+                datatoc_effect_smaa_vert_glsl,
                 NULL,
             },
         .frag =
@@ -128,7 +128,7 @@ GPUShader *eevee_shader_antialiasing_get(int stage)
                 "#define SMAA_INCLUDE_PS 1\n",
                 "uniform vec4 viewportMetrics;\n",
                 datatoc_common_smaa_lib_glsl,
-                datatoc_workbench_effect_smaa_frag_glsl,
+                datatoc_effect_smaa_frag_glsl,
                 NULL,
             },
         .defs =
