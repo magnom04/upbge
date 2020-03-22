@@ -457,11 +457,16 @@ class RENDER_PT_eevee_sampling(RenderButtonsPanel, Panel):
         scene = context.scene
         props = scene.eevee
 
+        row = layout.row()                #Game engine transition
+        row.prop(props, "use_eevee_taa")  #Game engine transition
+
         col = layout.column(align=True)
+        col.active = props.use_eevee_taa  #Game engine transition
         col.prop(props, "taa_render_samples", text="Render")
         col.prop(props, "taa_samples", text="Viewport")
 
         col = layout.column()
+        col.active = props.use_eevee_taa  #Game engine transition
         col.prop(props, "use_taa_reprojection")
 
         row = layout.row()                #Game engine transition

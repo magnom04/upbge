@@ -2540,6 +2540,7 @@ enum {
   SCE_EEVEE_SHADOW_SOFT = (1 << 20),
   SCE_EEVEE_OVERSCAN = (1 << 21),
   SCE_EEVEE_SMAA = (1 << 22),
+  SCE_EEVEE_TAA = (1 << 23),
 };
 
 /* SceneEEVEE->shadow_method */
