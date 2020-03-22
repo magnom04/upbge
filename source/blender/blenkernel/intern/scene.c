@@ -248,6 +248,8 @@ static void scene_init_data(ID *id)
   scene->gm.lodflag = SCE_LOD_USE_HYST;
   scene->gm.scehysteresis = 10;
 
+  scene->eevee.flag |= SCE_EEVEE_TAA;
+
   // scene->gm.pythonkeys[0] = LEFTCTRLKEY;
   // scene->gm.pythonkeys[1] = LEFTSHIFTKEY;
   // scene->gm.pythonkeys[2] = LEFTALTKEY;
