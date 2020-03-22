@@ -31,79 +31,9 @@
  * to the scene buffer. We softly blend between SMAA and TAA to avoid really harsh transitions.
  */
 
-#include "ED_screen.h"
-
-#include "BLI_jitter_2d.h"
-
 #include "smaa_textures.h"
 
 #include "eevee_private.h"
-
-#define SMAA_THRESHOLD 16
-
-static struct {
-  bool init;
-  float jitter_5[5][2];
-  float jitter_8[8][2];
-  float jitter_11[11][2];
-  float jitter_16[16][2];
-  float jitter_32[32][2];
-} e_data = {false};
-
-static void eevee_taa_jitter_init_order(float (*table)[2], int num)
-{
-  BLI_jitter_init(table, num);
-
-  /* find closest element to center */
-  int closest_index = 0;
-  float closest_squared_distance = 1.0f;
-
-  for (int index = 0; index < num; index++) {
-    const float squared_dist = square_f(table[index][0]) + square_f(table[index][1]);
-    if (squared_dist < closest_squared_distance) {
-      closest_squared_distance = squared_dist;
-      closest_index = index;
-    }
-  }
-
-  /* move jitter table so that closest sample is in center */
-  for (int index = 0; index < num; index++) {
-    sub_v2_v2(table[index], table[closest_index]);
-    mul_v2_fl(table[index], 2.0f);
-  }
-
-  /* swap center sample to the start of the table */
-  if (closest_index != 0) {
-    swap_v2_v2(table[0], table[closest_index]);
-  }
-
-  /* sort list based on furtest distance with previous */
-  for (int i = 0; i < num - 2; i++) {
-    float f_squared_dist = 0.0;
-    int f_index = i;
-    for (int j = i + 1; j < num; j++) {
-      const float squared_dist = square_f(table[i][0] - table[j][0]) +
-                                 square_f(table[i][1] - table[j][1]);
-      if (squared_dist > f_squared_dist) {
-        f_squared_dist = squared_dist;
-        f_index = j;
-      }
-    }
-    swap_v2_v2(table[i + 1], table[f_index]);
-  }
-}
-
-static void eevee_taa_jitter_init(void)
-{
-  if (e_data.init == false) {
-    e_data.init = true;
-    eevee_taa_jitter_init_order(e_data.jitter_5, 5);
-    eevee_taa_jitter_init_order(e_data.jitter_8, 8);
-    eevee_taa_jitter_init_order(e_data.jitter_11, 11);
-    eevee_taa_jitter_init_order(e_data.jitter_16, 16);
-    eevee_taa_jitter_init_order(e_data.jitter_32, 32);
-  }
-}
 
 int EEVEE_antialiasing_engine_init(EEVEE_Data *vedata)
 {
@@ -123,10 +53,6 @@ int EEVEE_antialiasing_engine_init(EEVEE_Data *vedata)
   }
 
   DrawEngineType *owner = (DrawEngineType *)&EEVEE_antialiasing_engine_init;
-  g_data->view = NULL;
-
-  
-  eevee_taa_jitter_init();
 
   DRW_texture_ensure_fullscreen_2d(&txl->history_buffer_tx, GPU_RGBA16F, DRW_TEX_FILTER);
   DRW_texture_ensure_fullscreen_2d(&txl->depth_buffer_tx, GPU_DEPTH24_STENCIL8, 0);
@@ -200,15 +126,6 @@ void EEVEE_antialiasing_cache_init(EEVEE_Data *vedata)
     return;
   }
 
-  {
-    DRW_PASS_CREATE(psl->aa_accum_ps, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
-
-    GPUShader *shader = eevee_shader_antialiasing_accumulation_get();
-    grp = DRW_shgroup_create(shader, psl->aa_accum_ps);
-    DRW_shgroup_uniform_texture(grp, "colorBuffer", dtxl->color);
-    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
-  }
-
   const float *size = DRW_viewport_size_get();
   const float *sizeinv = DRW_viewport_invert_size_get();
   float metrics[4] = {sizeinv[0], sizeinv[1], size[0], size[1]};
@@ -255,52 +172,6 @@ void EEVEE_antialiasing_cache_init(EEVEE_Data *vedata)
   }
 }
 
-/* Return true if render is not cached. */
-void eevee_antialiasing_setup(EEVEE_Data *vedata)
-{
-  EEVEE_PrivateData *g_data = vedata->stl->g_data;
-
-  EEVEE_EffectsInfo *effects = vedata->stl->effects;
-  if (!(effects->enabled_effects & EFFECT_SMAA)) {
-    return;
-  }
-
-  if (vedata->stl->effects->taa_current_sample >= SMAA_THRESHOLD) {
-    /* TAA accumulation has finish. Just copy the result back */
-    return;
-  }
-  else {
-    const float *viewport_size = DRW_viewport_size_get();
-    const DRWView *default_view = DRW_view_default_get();
-    float *transform_offset;
-
-    transform_offset = e_data.jitter_32[min_ii(vedata->stl->effects->taa_current_sample, 32)];
-
-    /* construct new matrices from transform delta */
-    float winmat[4][4], viewmat[4][4], persmat[4][4];
-    DRW_view_winmat_get(default_view, winmat, false);
-    DRW_view_viewmat_get(default_view, viewmat, false);
-    DRW_view_persmat_get(default_view, persmat, false);
-
-    window_translate_m4(winmat,
-                        persmat,
-                        transform_offset[0] / viewport_size[0],
-                        transform_offset[1] / viewport_size[1]);
-
-    if (g_data->view) {
-      /* When rendering just update the view. This avoids recomputing the culling. */
-      DRW_view_update_sub(g_data->view, viewmat, winmat);
-    }
-    else {
-      /* TAA is not making a big change to the matrices.
-       * Reuse the main view culling by creating a sub-view. */
-      g_data->view = DRW_view_create_sub(default_view, viewmat, winmat);
-    }
-    DRW_view_set_active(g_data->view);
-    return;
-  }
-}
-
 void EEVEE_antialiasing_draw_pass(EEVEE_Data *vedata)
 {
   EEVEE_PrivateData *g_data = vedata->stl->g_data;
@@ -313,43 +184,23 @@ void EEVEE_antialiasing_draw_pass(EEVEE_Data *vedata)
     return;
   }
 
-  eevee_antialiasing_setup(vedata);
-
-  /**
-   * We always do SMAA on top of TAA accumulation, unless the number of samples of TAA is already
-   * high. This ensure a smoother transition.
-   * If TAA accumulation is finished, we only blit the result.
-   */
-  if (vedata->stl->effects->taa_current_sample < SMAA_THRESHOLD) {
+  if (1/*vedata->stl->effects->taa_current_sample == 1*/) {
     /* In playback mode, we are sure the next redraw will not use the same viewmatrix.
      * In this case no need to save the depth buffer. */
-    eGPUFrameBufferBits bits = vedata->stl->effects->taa_current_sample == 1 ? GPU_COLOR_BIT :
-                                                                               GPU_COLOR_BIT | GPU_DEPTH_BIT;
+    eGPUFrameBufferBits bits = GPU_COLOR_BIT;
     GPU_framebuffer_blit(dfbl->default_fb, 0, fbl->antialiasing_fb, 0, bits);
 
     /* After a certain point SMAA is no longer necessary. */
-    g_data->smaa_mix_factor = 1.0f - clamp_f(vedata->stl->effects->taa_current_sample / 4.0f,
-                                             0.0f,
-                                             1.0f);
-    g_data->taa_sample_inv = 1.0f /
-                             clamp_f((vedata->stl->effects->taa_current_sample + 1), 0.0f, 1.0f);
+    g_data->smaa_mix_factor = 0.75f;
+    g_data->taa_sample_inv = 1.0f;
 
-    if (g_data->smaa_mix_factor > 0.0f) {
-      GPU_framebuffer_bind(fbl->smaa_edge_fb);
-      DRW_draw_pass(psl->aa_edge_ps);
+    GPU_framebuffer_bind(fbl->smaa_edge_fb);
+    DRW_draw_pass(psl->aa_edge_ps);
 
-      GPU_framebuffer_bind(fbl->smaa_weight_fb);
-      DRW_draw_pass(psl->aa_weight_ps);
-    }
+    GPU_framebuffer_bind(fbl->smaa_weight_fb);
+    DRW_draw_pass(psl->aa_weight_ps);
 
     GPU_framebuffer_bind(dfbl->default_fb);
     DRW_draw_pass(psl->aa_resolve_ps);
-  }
-  else {
-    /* Accumulate result to the TAA buffer. */
-    GPU_framebuffer_bind(fbl->antialiasing_fb);
-    DRW_draw_pass(psl->aa_accum_ps);
-    /* Copy back the saved depth buffer for correct overlays. */
-    GPU_framebuffer_blit(fbl->antialiasing_fb, 0, dfbl->default_fb, 0, GPU_DEPTH_BIT);
   }
 }
