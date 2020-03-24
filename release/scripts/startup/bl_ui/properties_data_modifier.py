@@ -1350,7 +1350,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
         layout.separator()
 
-        layout.prop(md, "falloff_type")
+        row = layout.row(align=True)
+        row.prop(md, "falloff_type")
+        row.prop(md, "invert_falloff", text="", icon='ARROW_LEFTRIGHT')
         if md.falloff_type == 'CURVE':
             layout.template_curve_mapping(md, "map_curve")
 
@@ -1408,7 +1410,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "max_dist")
 
         layout.separator()
-        layout.prop(md, "falloff_type")
+        row = layout.row(align=True)
+        row.prop(md, "falloff_type")
+        row.prop(md, "invert_falloff", text="", icon='ARROW_LEFTRIGHT')
 
         # Common mask options
         layout.separator()
@@ -1996,16 +2000,21 @@ class DATA_PT_gpencil_modifiers(ModifierButtonsPanel, Panel):
         split = layout.split()
 
         col = split.column()
-        col.prop(md, "normalize_opacity")
-        if md.normalize_opacity is True:
-            text="Strength"
-        else:
-            text="Opacity Factor"
-
-        col.prop(md, "factor", text=text)
         col.prop(md, "modify_color")
 
-        self.gpencil_masking(layout, ob, md, True, True)
+        if md.modify_color == 'HARDENESS':
+            col.prop(md, "hardeness")
+            show = False
+        else:
+            col.prop(md, "normalize_opacity")
+            if md.normalize_opacity is True:
+                text="Strength"
+            else:
+                text="Opacity Factor"
+
+            col.prop(md, "factor", text=text)
+            show = True
+        self.gpencil_masking(layout, ob, md, show, show)
 
     def GP_ARRAY(self, layout, ob, md):
         col = layout.column()
